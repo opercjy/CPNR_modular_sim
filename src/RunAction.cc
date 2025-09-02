@@ -6,7 +6,9 @@ RunAction::RunAction() : G4UserRunAction()
 {
   auto analysisManager = G4AnalysisManager::Instance();
   analysisManager->SetVerboseLevel(1);
-  analysisManager->SetNtupleMerging(true);
+  if (G4Threading::IsMultithreadedApplication()) {
+    analysisManager->SetNtupleMerging(true);
+  }
 
   // Ntuple ID=0: Hits (에너지 증착 상세 정보)
   analysisManager->CreateNtuple("Hits", "Hit-by-hit energy deposition data");
