@@ -1,5 +1,11 @@
 # =============================================================
-# vis.mac : CPNR_modular_sim 시각화용 최종 매크로 (표준 명령어 수정)
+# vis.mac : CPNR_modular_sim 시각화용 최종 매크로
+# =============================================================
+#
+# 주의: 이 시뮬레이션을 실행하기 전, 터미널에서 ANNRI-Gd 데이터 파일이
+#       있는 경로를 GD_CAPTURE_DATA_DIR 환경 변수로 설정해야 합니다.
+#       예: export GD_CAPTURE_DATA_DIR=./data
+#
 # =============================================================
 
 # --- 1. 시각화 환경 설정 ---
@@ -27,18 +33,21 @@
 # 설정한 색상 모델을 사용하도록 선택
 /vis/modeling/trajectories/select drawByParticleID-0
 
-# 모든 입자의 궤적을 저장하고 그리도록 설정
-/tracking/storeTrajectory 1
-/vis/scene/add/trajectories
 
-# --- 3. Geant4 커널 초기화 ---
+# --- 3. 물리 모델 설정 ---
+# ANNRI-Gd 모델을 natural Gd 모드로, 연속+이산 스펙트럼 모두 사용하도록 설정
+/myApp/phys/gd/captureMode 1
+/myApp/phys/gd/cascadeMode 1
+/myApp/phys/gd/verbose 1
+
+# --- 4. Geant4 커널 초기화 ---
 /run/initialize
 
-# --- 4. 입자 소스 설정 (GPS) ---
+# --- 5. 입자 소스 설정 (GPS) ---
 /gps/particle neutron
 /gps/energy 2.5 MeV
-/gps/position 0 0 -150 cm
+/gps/position 0 0 -100 cm
 /gps/direction 0 0 1
 
-# --- 5. 시뮬레이션 실행 ---
+# --- 6. 시뮬레이션 실행 ---
 /run/beamOn 5
