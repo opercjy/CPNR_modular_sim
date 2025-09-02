@@ -9,7 +9,7 @@
 #include "G4ScoringManager.hh"
 
 #include "DetectorConstruction.hh"
-#include "PhysicsList.hh"
+#include "MyShieldingPhysList.hh" 
 #include "ActionInitialization.hh"
 
 int main(int argc, char** argv)
@@ -37,7 +37,7 @@ int main(int argc, char** argv)
 
   // 필수 사용자 클래스들을 RunManager에 등록
   runManager->SetUserInitialization(new DetectorConstruction());
-  runManager->SetUserInitialization(new PhysicsList());
+  runManager->SetUserInitialization(new MyShieldingPhysList()); 
   runManager->SetUserInitialization(new ActionInitialization());
   
   // Geant4 커널 초기화
