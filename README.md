@@ -1,7 +1,6 @@
 # CPNR_modular_sim
 # Geant4 기반 모듈형 검출기 시뮬레이션: CPNR_modular_sim
 <img width="1320" height="1020" alt="image" src="https://github.com/user-attachments/assets/7f61aa08-f10d-4450-8f7b-e7df066cb323" />
-
 <img width="1320" height="1020" alt="image" src="https://github.com/user-attachments/assets/a0cb7f6a-d35e-4c8c-9937-1430881596ce" />
 
 ## 1. 프로젝트 개요
@@ -52,4 +51,4 @@ CPNR_modular_sim.cc: 시뮬레이션의 시작점(main 함수).
 include/: 모든 C++ 클래스의 헤더 파일(.hh).
 src/: 모든 C++ 클래스의 소스 파일(.cc).
 
-현재 개발중
+9월 3일 현재, 보다 정교한 핵구조/반응 물리 이식 중
