@@ -1,0 +1,48 @@
+# =============================================================
+# vis.mac : CPNR_modular_sim 시각화용 매크로
+# =============================================================
+
+# --- 1. 시각화 환경 설정 ---
+# OpenGL 그래픽 뷰어를 엽니다.
+/vis/open OGL
+
+# 월드 볼륨을 그립니다.
+/vis/drawVolume
+
+# 사용자가 보기 편한 시점을 설정합니다. (각도: theta, phi)
+/vis/viewer/set/viewpointThetaPhi 70 20
+
+# 뷰어를 약간 확대합니다.
+/vis/viewer/zoom 1.2
+
+# 입자의 궤적을 저장하고 그립니다.
+/tracking/storeTrajectory 1
+/vis/scene/add/trajectories
+
+# 여러 이벤트의 궤적을 누적해서 보여줍니다.
+/vis/scene/endOfEventAction accumulate
+
+
+# --- 2. Geant4 커널 초기화 ---
+# /run/beamOn을 사용하기 전에 반드시 실행해야 합니다.
+# 이 명령 이후에 기하구조나 물리 리스트 변경이 불가능해집니다.
+/run/initialize
+
+
+# --- 3. 입자 소스 설정 (General Particle Source, GPS) ---
+# 중성자를 초기 입자로 설정합니다.
+/gps/particle neutron
+
+# 중성자의 운동 에너지를 2.5 MeV로 설정합니다. (열중성자화를 관찰하기 좋은 에너지)
+/gps/energy 2.5 MeV
+
+# 입자 소스의 위치를 검출기 배열 앞 (-100 cm) 중앙에 둡니다.
+/gps/position 0 0 -100 cm
+
+# 입자를 검출기 방향(+z)으로 발사합니다.
+/gps/direction 0 0 1
+
+
+# --- 4. 시뮬레이션 실행 ---
+# 10개의 이벤트를 실행하여 궤적을 확인합니다.
+/run/beamOn 10
