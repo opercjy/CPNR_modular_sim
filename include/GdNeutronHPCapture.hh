@@ -56,6 +56,7 @@ private:
     G4int fCascadeMode;      // 1:all, 2:discrete, 3:continuum
     G4String fGd155DataFile;
     G4String fGd157DataFile;
+    G4int    fVerboseLevel; // 상세 출력 제어 변수
 
     // --- Helper 함수 ---
     void DefineCommands(); // 메신저 명령어 정의 함수
