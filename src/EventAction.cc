@@ -6,7 +6,11 @@
 #include "LSHit.hh"
 #include "PMTHit.hh"
 
-// ... (생성자, 소멸자) ...
+// std::set을 사용하여 중복된 트랙을 효율적으로 제거하기 위해 헤더를 포함합니다.
+#include <set>
+
+EventAction::EventAction() : G4UserEventAction() {}
+EventAction::~EventAction() {}
 
 void EventAction::EndOfEventAction(const G4Event* event)
 {
