@@ -5,7 +5,7 @@
 # 최소 CMake 버전 요구사항 지정
 cmake_minimum_required(VERSION 3.16)
 
-# 프로젝트 이름 설정 (실実行 파일 이름으로 사용됨)
+# 프로젝트 이름 설정 (실행 파일 이름으로 사용됨)
 project(CPNR_modular_sim)
 
 # --- 패키지 검색 ---
@@ -39,6 +39,23 @@ set(PROJECT_SOURCES
 # --- 실행 파일 생성 및 라이브러리 연결 ---
 add_executable(${PROJECT_NAME} ${PROJECT_NAME}.cc ${PROJECT_SOURCES})
 target_link_libraries(${PROJECT_NAME} PRIVATE ${Geant4_LIBRARIES} ${ROOT_LIBRARIES})
+
+# --- [수정된 부분] 매크로 파일 복사 ---
+# 시뮬레이션 실행에 필요한 매크로(.mac) 파일들을
+# 소스 디렉토리에서 빌드 디렉토리로 자동으로 복사합니다.
+set(MACRO_FILES
+  vis.mac
+  run.mac
+)
+
+foreach(macro ${MACRO_FILES})
+  configure_file(
+    ${PROJECT_SOURCE_DIR}/${macro}
+    ${PROJECT_BINARY_DIR}/${macro}
+    COPYONLY
+  )
+endforeach()
+
 
 # --- 설치 (선택 사항) ---
 install(TARGETS ${PROJECT_NAME} RUNTIME DESTINATION bin)
