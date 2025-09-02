@@ -3,6 +3,8 @@
 
 #include "G4ParticleHPFinalState.hh"
 #include "G4ParticleHPPhotonDist.hh"
+#include "G4LorentzVector.hh"
+#include "ANNRIGd_ReactionProduct.hh" // ReactionProductVector 사용
 
 class GdNeutronHPCaptureFS : public G4ParticleHPFinalState {
  public:
@@ -17,6 +19,11 @@ class GdNeutronHPCaptureFS : public G4ParticleHPFinalState {
   }
   
  private:
+  // [추가] 가독성을 위한 헬퍼 함수들
+  void CalculateInitialState(const G4HadProjectile& theTrack, G4ReactionProduct& theNeutron, G4ReactionProduct& theTarget, G4LorentzVector& pInitial);
+  void AddSecondariesToFinalState(const ANNRIGdGammaSpecModel::ReactionProductVector& products, const G4ReactionProduct& theTarget, G4LorentzVector& pFinalProducts);
+  void AddRecoilToFinalState(const G4LorentzVector& pRecoil, G4int targZ, G4int targA);
+
   G4ParticleHPPhotonDist theFinalStatePhotons;
 };
 #endif
