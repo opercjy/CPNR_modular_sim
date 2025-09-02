@@ -29,11 +29,18 @@ set(PROJECT_SOURCES
     ${PROJECT_SOURCE_DIR}/src/LSSD.cc
     ${PROJECT_SOURCE_DIR}/src/PMTHit.cc
     ${PROJECT_SOURCE_DIR}/src/PMTSD.cc
-    ${PROJECT_SOURCE_DIR}/src/PhysicsList.cc
     ${PROJECT_SOURCE_DIR}/src/PrimaryGeneratorAction.cc
     ${PROJECT_SOURCE_DIR}/src/RunAction.cc
     ${PROJECT_SOURCE_DIR}/src/SteppingAction.cc
     ${PROJECT_SOURCE_DIR}/src/TrackingAction.cc
+    
+    # [추가] ANNRI-Gd 연동 클래스들
+    src/GdNeutronHPCapture.cc
+    src/GdNeutronHPCaptureFS.cc
+    
+    # [추가] 새로운 물리 리스트 관련 클래스들
+    src/MyHadronPhysics.cc
+    src/MyShieldingPhysList.cc
 )
 
 # --- 실행 파일 생성 및 라이브러리 연결 ---
