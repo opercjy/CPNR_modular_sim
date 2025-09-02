@@ -1,35 +1,35 @@
 # =============================================================
 # run.mac : CPNR_modular_sim 데이터 생성용 매크로
 # =============================================================
+#
+# 주의: 이 시뮬레이션을 실행하기 전, 터미널에서 ANNRI-Gd 데이터 파일이
+#       있는 경로를 GD_CAPTURE_DATA_DIR 환경 변수로 설정해야 합니다.
+#       예: export GD_CAPTURE_DATA_DIR=./data
+#
+# =============================================================
 
 # --- 1. 출력 메시지 최소화 ---
-# 시뮬레이션 속도 향상을 위해 터미널 출력을 최소화합니다.
 /run/verbose 0
 /event/verbose 0
 /tracking/verbose 0
 
+# --- 2. 물리 모델 설정 ---
+# 배치 실행에 사용할 물리 설정을 명시적으로 지정합니다.
+/myApp/phys/gd/captureMode 1
+/myApp/phys/gd/cascadeMode 1
+# 배치 모드에서는 초기화 메시지를 출력하지 않도록 verbose 0으로 설정합니다.
+/myApp/phys/gd/verbose 0
 
-# --- 2. Geant4 커널 초기화 ---
+# --- 3. Geant4 커널 초기화 ---
 /run/initialize
 
-
-# --- 3. 입자 소스 설정 (General Particle Source, GPS) ---
-# 입자: 중성자
+# --- 4. 입자 소스 설정 (GPS) ---
 /gps/particle neutron
-
-# 에너지: 4.5 MeV (AmBe 소스와 유사한 에너지)
-/gps/energy 4.5 MeV
-
-# 위치: 검출기 배열 앞 중앙
-/gps/position 0 0 -100 cm
-
-# 방출 각도: 모든 방향으로 균일하게 방출 (Isotropic)
+/energy 2.5 MeV
+/position 0 0 -100 cm
 /gps/ang/type iso
 
-
-# --- 4. 시뮬레이션 실행 ---
-# 100,000개의 이벤트를 실행하여 통계적으로 의미있는 데이터를 생성합니다.
-# 이 숫자를 늘리면 데이터의 정확도는 높아지지만 실행 시간이 길어집니다.
+# --- 5. 시뮬레이션 실행 ---
 /run/beamOn 100000
 
 # --- 완료 메시지 ---
