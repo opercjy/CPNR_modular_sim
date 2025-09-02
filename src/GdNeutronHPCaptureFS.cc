@@ -67,7 +67,7 @@ G4HadFinalState* GdNeutronHPCaptureFS::ApplyYourself(const G4HadProjectile& theT
     G4LorentzVector pFinalProducts(0,0,0,0);
     AddSecondariesToFinalState(products, theTarget, pFinalProducts);
     
-    // 4. 운동량 보존을 위해 반도일 핵 추가
+    // 4. 운동량 보존을 위해 반동된(recoil) 핵 추가
     G4LorentzVector pRecoil = pInitial - pFinalProducts;
     AddRecoilToFinalState(pRecoil, targZ, targA);
 
@@ -117,7 +117,7 @@ void GdNeutronHPCaptureFS::AddSecondariesToFinalState(const ANNRIGdGammaSpecMode
 }
 
 /**
- * @brief Helper: 운동량 보존을 위해 반도일 핵을 추가
+ * @brief Helper: 운동량 보존을 위해 되튐(recoiled) 핵을 추가
  */
 void GdNeutronHPCaptureFS::AddRecoilToFinalState(const G4LorentzVector& pRecoil, G4int targZ, G4int targA) 
 {
