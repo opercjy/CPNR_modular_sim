@@ -1,48 +1,44 @@
 # =============================================================
-# vis.mac : CPNR_modular_sim 시각화용 매크로
+# vis.mac : CPNR_modular_sim 시각화용 최종 매크로 (표준 명령어 수정)
 # =============================================================
 
 # --- 1. 시각화 환경 설정 ---
-# OpenGL 그래픽 뷰어를 엽니다.
 /vis/open OGL
-
-# 월드 볼륨을 그립니다.
 /vis/drawVolume
-
-# 사용자가 보기 편한 시점을 설정합니다. (각도: theta, phi)
 /vis/viewer/set/viewpointThetaPhi 70 20
-
-# 뷰어를 약간 확대합니다.
 /vis/viewer/zoom 1.2
+/vis/scene/endOfEventAction accumulate
 
-# 입자의 궤적을 저장하고 그립니다.
+# --- 2. 입자별 궤적 색상 설정 ---
+/vis/modeling/trajectories/create/drawByParticleID
+
+# [수정] 각 set 명령어에 색상 이름과 투명도(alpha) 값을 함께 지정합니다.
+# 형식: /.../set <입자이름> <색상이름> <투명도값>
+/vis/modeling/trajectories/drawByParticleID-0/set e-         red    0.8
+/vis/modeling/trajectories/drawByParticleID-0/set e+         blue   0.8
+/vis/modeling/trajectories/drawByParticleID-0/set gamma      green  0.5
+/vis/modeling/trajectories/drawByParticleID-0/set neutron    yellow 0.8
+/vis/modeling/trajectories/drawByParticleID-0/set opticalphoton magenta 0.1
+
+# setDefault 명령어에도 투명도를 추가할 수 있습니다.
+/vis/modeling/trajectories/drawByParticleID-0/setDefault gray 0.5
+
+
+# 설정한 색상 모델을 사용하도록 선택
+/vis/modeling/trajectories/select drawByParticleID-0
+
+# 모든 입자의 궤적을 저장하고 그리도록 설정
 /tracking/storeTrajectory 1
 /vis/scene/add/trajectories
 
-# 여러 이벤트의 궤적을 누적해서 보여줍니다.
-/vis/scene/endOfEventAction accumulate
-
-
-# --- 2. Geant4 커널 초기화 ---
-# /run/beamOn을 사용하기 전에 반드시 실행해야 합니다.
-# 이 명령 이후에 기하구조나 물리 리스트 변경이 불가능해집니다.
+# --- 3. Geant4 커널 초기화 ---
 /run/initialize
 
-
-# --- 3. 입자 소스 설정 (General Particle Source, GPS) ---
-# 중성자를 초기 입자로 설정합니다.
+# --- 4. 입자 소스 설정 (GPS) ---
 /gps/particle neutron
-
-# 중성자의 운동 에너지를 2.5 MeV로 설정합니다. (열중성자화를 관찰하기 좋은 에너지)
 /gps/energy 2.5 MeV
-
-# 입자 소스의 위치를 검출기 배열 앞 (-100 cm) 중앙에 둡니다.
-/gps/position 0 0 -100 cm
-
-# 입자를 검출기 방향(+z)으로 발사합니다.
+/gps/position 0 0 -150 cm
 /gps/direction 0 0 1
 
-
-# --- 4. 시뮬레이션 실행 ---
-# 10개의 이벤트를 실행하여 궤적을 확인합니다.
-/run/beamOn 10
+# --- 5. 시뮬레이션 실행 ---
+/run/beamOn 5
