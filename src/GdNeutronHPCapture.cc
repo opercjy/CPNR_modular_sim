@@ -1,4 +1,5 @@
 #include "GdNeutronHPCapture.hh"
+#include <cstdlib> // getenv 사용을 위해 추가
 
 // Geant4 includes
 #include "G4GenericMessenger.hh"
@@ -38,8 +39,7 @@ GdNeutronHPCapture::GdNeutronHPCapture()
     fIsGeneratorInitialized(false),
     fCaptureMode(1), // 기본값: natural Gd
     fCascadeMode(1), // 기본값: discrete + continuum
-    fGd155DataFile("data/156GdContTbl_E1SLO4_HFB.root"), // 기본 데이터 파일 경로
-    fGd157DataFile("data/158GdContTbl_E1SLO4_HFB.root")
+    fVerboseLevel(1) // 기본 Verbosity는 1로 설정
 {
     SetMinEnergy(0.0);
     SetMaxEnergy(20. * MeV);
@@ -67,6 +67,9 @@ GdNeutronHPCapture::~GdNeutronHPCapture() {
 void GdNeutronHPCapture::DefineCommands() {
     fMessenger = std::make_unique<G4GenericMessenger>(this, "/myApp/phys/gd/", "ANNRI-Gd Model Control");
 
+    auto& verboseCmd = fMessenger->DeclareProperty("verbose", fVerboseLevel, "Set verbosity level (0:silent, 1:default)");
+    verboseCmd.SetParameterName("level", false);
+
     auto& captureCmd = fMessenger->DeclareProperty("captureMode", fCaptureMode, "Set Gd capture mode (1:nat, 2:157Gd, 3:155Gd)");
     captureCmd.SetParameterName("mode", false);
     captureCmd.SetGuidance(" 1: natural Gd\n 2: enriched 157Gd\n 3: enriched 155Gd");
@@ -86,17 +89,34 @@ void GdNeutronHPCapture::DefineCommands() {
  * @brief ANNRI-Gd 생성기를 멤버 변수에 설정된 값으로 초기화하는 함수
  */
 void GdNeutronHPCapture::InitializeGenerator() {
-    if (!fIsGeneratorInitialized) {
-        G4cout << "GdNeutronHPCapture: Initializing ANNRI-Gd Generator with user settings..." << G4endl;
-        fAnnriGammaGen = std::make_unique<ANNRIGdGammaSpecModel::ANNRIGd_GdNCaptureGammaGenerator>();
-        
-        // Configure 함수는 모든 모델을 생성해야 하므로, 항상 모든 데이터 파일을 전달합니다.
-        // 실제 어떤 모델을 사용할지는 ApplyYourself 단계에서 결정됩니다.
-        ANNRIGdGammaSpecModel::ANNRIGd_GeneratorConfigurator::Configure(
-            *fAnnriGammaGen, 1, 1, fGd155DataFile, fGd157DataFile
-        );
-        fIsGeneratorInitialized = true;
-        G4cout << "GdNeutronHPCapture: ANNRI-Gd Generator Initialized." << G4endl;
+    if (fIsGeneratorInitialized) return;
+    const char* dataDirEnv = getenv("GD_CAPTURE_DATA_DIR");
+    if (!dataDirEnv) {
+        G4String msg = "Environment variable GD_CAPTURE_DATA_DIR is not set! Please set it to the directory containing ANNRI-Gd data files.";
+        G4Exception("GdNeutronHPCapture::InitializeGenerator()", "FatalError", FatalException, msg);
+    }
+    
+    // 환경 변수 경로를 사용하여 전체 파일 경로를 재구성합니다.
+    G4String dataDir = dataDirEnv;
+    fGd155DataFile = dataDir + "/" + "156GdContTbl_E1SLO4_HFB.root";
+    fGd157DataFile = dataDir + "/" + "158GdContTbl_E1SLO4_HFB.root";
+
+    if (fVerboseLevel > 0) {
+        G4cout << "GdNeutronHPCapture: Initializing ANNRI-Gd Generator..." << G4endl;
+        G4cout << ">> Using 155Gd data file: " << fGd155DataFile << G4endl;
+        G4cout << ">> Using 157Gd data file: " << fGd157DataFile << G4endl;
+    }
+    fAnnriGammaGen = std::make_unique<ANNRIGdGammaSpecModel::ANNRIGd_GdNCaptureGammaGenerator>();
+    ANNRIGdGammaSpecModel::ANNRIGd_GeneratorConfigurator::Configure(
+        *fAnnriGammaGen, 1, 1, fGd155DataFile, fGd157DataFile
+    );
+    fIsGeneratorInitialized = true;
+    ANNRIGdGammaSpecModel::ANNRIGd_GdNCaptureGammaGenerator* GdNeutronHPCapture::GetANNRIGdGenerator() {
+    // Master 스레드에서만 초기화를 수행합니다.
+    if (!fIsGeneratorInitialized && G4Threading::IsMasterThread()) {
+        InitializeGenerator();
+    }
+    return fAnnriGammaGen.get();
     }
 }
 
