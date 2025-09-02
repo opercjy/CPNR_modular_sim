@@ -13,6 +13,8 @@
 #include "G4RandomDirection.hh"
 #include "G4ParticleHPDataUsed.hh"
 #include "G4ParticleHPNames.hh"
+#include "G4PhysicsModelCatalog.hh"
+#include "G4ParticleHPThermalBoost.hh"
 
 // ANNRI-Gd includes (RAT 경로 제거)
 #include "ANNRIGd_GdNCaptureGammaGenerator.hh"
@@ -20,31 +22,33 @@
 
 GdNeutronHPCaptureFS::GdNeutronHPCaptureFS() 
 {
-    // secID는 G4VSecondaryGenerator에서 상속받은 멤버 변수입니다.
-    // 모델을 식별하는 고유 ID를 할당할 수 있습니다.
     secID = G4PhysicsModelCatalog::GetModelID("model_NeutronHPCapture_ANNRI_FS");
     hasXsec = false;
 }
 
+/**
+ * @brief 메인 함수: 역할을 분리하여 코드 흐름을 명확하게 보여줍니다.
+ */
 G4HadFinalState* GdNeutronHPCaptureFS::ApplyYourself(const G4HadProjectile& theTrack) 
 {
     if (theResult.Get() == nullptr) theResult.Put(new G4HadFinalState);
     theResult.Get()->Clear();
 
-    // --- 1. GdNeutronHPCapture 싱글턴 인스턴스에서 ANNRI-Gd 생성기와 설정을 가져옴 ---
+    // 1. 초기 상태 운동량 계산
+    G4ReactionProduct theNeutron;
+    G4ReactionProduct theTarget;
+    G4LorentzVector pInitial;
+    CalculateInitialState(theTrack, theNeutron, theTarget, pInitial);
+
+    // 2. ANNRI-Gd 생성기 호출 및 감마선 생성
     auto manager = GdNeutronHPCapture::GetInstance();
     auto annriGenerator = manager->GetANNRIGdGenerator();
-
-    // Geant4의 "화이트보드"에서 현재 반응하는 타겟 동위원소 정보를 가져옵니다.
     G4int targA = G4ParticleHPManager::GetInstance()->GetReactionWhiteBoard()->GetTargA();
     G4int targZ = G4ParticleHPManager::GetInstance()->GetReactionWhiteBoard()->GetTargZ();
     const G4Isotope* target_isotope = G4IonTable::GetIonTable()->GetIsotope(targZ, targA, 0.0);
-
-    // 동위원소 정보와 사용자 설정을 바탕으로 어떤 모드를 사용할지 결정합니다.
-    G4int captureMode = manager->GetCaptureModeForIsotope(target_isotope);
-    G4int cascadeMode = manager->GetCascadeMode();
+    int captureMode = manager->GetCaptureModeForIsotope(target_isotope);
+    int cascadeMode = manager->GetCascadeMode();
     
-    // --- 2. ANNRI-Gd 생성기를 사용하여 감마선 생성 ---
     ANNRIGdGammaSpecModel::ReactionProductVector products;
 
     if (captureMode == 1) { // Natural Gd
@@ -59,51 +63,67 @@ G4HadFinalState* GdNeutronHPCaptureFS::ApplyYourself(const G4HadProjectile& theT
         else                      products = annriGenerator->Generate_156Gd_Continuum();
     }
     
-    auto theProducts = ANNRIGdGammaSpecModel::ANNRIGd_OutputConverter::ConvertToG4(products);
+    // 3. 2차 입자(감마, 전자)들을 Final State에 추가
+    G4LorentzVector pFinalProducts(0,0,0,0);
+    AddSecondariesToFinalState(products, theTarget, pFinalProducts);
+    
+    // 4. 운동량 보존을 위해 반도일 핵 추가
+    G4LorentzVector pRecoil = pInitial - pFinalProducts;
+    AddRecoilToFinalState(pRecoil, targZ, targA);
 
-    // --- 3. 생성된 입자들을 Geant4의 최종 상태(Final State)에 추가 ---
-    // 운동량 보존을 위해 초기 상태의 운동량을 계산합니다.
-    G4ReactionProduct theNeutron(theTrack.GetDefinition());
+    theResult.Get()->SetStatusChange(stopAndKill);
+    return theResult.Get();
+}
+
+/**
+ * @brief Helper: 초기 상태(중성자+타겟)의 운동량을 계산
+ */
+void GdNeutronHPCaptureFS::CalculateInitialState(const G4HadProjectile& theTrack, G4ReactionProduct& theNeutron, G4ReactionProduct& theTarget, G4LorentzVector& pInitial) 
+{
+    theNeutron.SetDefinition(theTrack.GetDefinition());
     theNeutron.SetMomentum(theTrack.Get4Momentum().vect());
     theNeutron.SetKineticEnergy(theTrack.GetKineticEnergy());
 
-    G4ReactionProduct theTarget;
     G4Nucleus aNucleus;
     G4double targetMass = G4NucleiProperties::GetNuclearMass(theBaseA, theBaseZ);
-    theTarget = aNucleus.GetBiasedThermalNucleus(targetMass, theNeutron.GetMomentum(), theTrack.GetMaterial()->GetTemperature());
+    G4ParticleHPThermalBoost aThermalE;
+    theTarget = aNucleus.GetBiasedThermalNucleus(targetMass, aThermalE.GetThermalCentralMomentum(theTrack.GetKineticEnergy(), targetMass, theTrack.GetMaterial()->GetTemperature()), theTrack.GetMaterial()->GetTemperature());
+    
+    pInitial = theNeutron.Get4Momentum() + theTarget.Get4Momentum();
+}
 
-    G4LorentzVector pInitial = theNeutron.Get4Momentum() + theTarget.Get4Momentum();
-    G4LorentzVector pFinalProducts(0,0,0,0);
+/**
+ * @brief Helper: ANNRI-Gd가 생성한 입자들을 Geant4의 2차 입자로 추가
+ */
+void GdNeutronHPCaptureFS::AddSecondariesToFinalState(const ANNRIGdGammaSpecModel::ReactionProductVector& products, const G4ReactionProduct& theTarget, G4LorentzVector& pFinalProducts) 
+{
+    auto g4products = ANNRIGdGammaSpecModel::ANNRIGd_OutputConverter::ConvertToG4(products);
 
-    // 생성된 모든 감마선/전자를 2차 입자로 추가하고 최종 운동량을 합산합니다.
-    for (size_t i = 0; i < theProducts->size(); ++i) {
-        auto theOne = new G4DynamicParticle;
-        theOne->SetDefinition((*theProducts)[i]->GetDefinition());
-        theOne->SetMomentum((*theProducts)[i]->GetMomentum());
+    for (size_t i = 0; i < g4products->size(); ++i) {
+        G4ReactionProduct* product = (*g4products)[i];
         
-        // Geant4 좌표계로 변환 (Lorentz boost)
-        G4ReactionProduct temp;
-        temp.SetDefinition(theOne->GetDefinition());
-        temp.SetTotalEnergy(theOne->GetTotalEnergy());
-        temp.SetMomentum(theOne->GetMomentum());
-        temp.Lorentz(temp, -1. * theTarget);
-        theOne->Set4Momentum(temp.Get4Momentum());
+        // ANNRI-Gd 생성기는 핵의 정지 좌표계에서 입자를 생성하므로, 실험실 좌표계로 변환(Lorentz boost)
+        product->Lorentz(*product, -1. * theTarget);
 
+        auto theOne = new G4DynamicParticle;
+        theOne->SetDefinition(product->GetDefinition());
+        theOne->Set4Momentum(product->Get4Momentum());
+        
         theResult.Get()->AddSecondary(theOne, secID);
         pFinalProducts += theOne->Get4Momentum();
-        delete (*theProducts)[i];
+        delete product;
     }
-    delete theProducts;
-    
-    // --- 4. 되튐 핵(Recoil Nucleus) 추가 및 운동량 보존 ---
+    delete g4products;
+}
+
+/**
+ * @brief Helper: 운동량 보존을 위해 반도일 핵을 추가
+ */
+void GdNeutronHPCaptureFS::AddRecoilToFinalState(const G4LorentzVector& pRecoil, G4int targZ, G4int targA) 
+{
     G4ParticleDefinition* recoil_def = G4IonTable::GetIonTable()->GetIon(targZ, targA + 1, 0.0);
-    G4LorentzVector pRecoil = pInitial - pFinalProducts;
     auto recoil_particle = new G4DynamicParticle(recoil_def, pRecoil);
     theResult.Get()->AddSecondary(recoil_particle, secID);
-
-    // 초기 중성자는 소멸시킴
-    theResult.Get()->SetStatusChange(stopAndKill);
-    return theResult.Get();
 }
 
 /**
