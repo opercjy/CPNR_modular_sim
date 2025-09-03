@@ -8,9 +8,9 @@
 // INCLUDES
 
 // ANNRIGdGammaSpecModel includes
-#include "RAT/ANNRIGd_156GdContinuumModelV2.hh"
+#include "ANNRIGd_156GdContinuumModelV2.hh"
 
-#include "RAT/ANNRIGd_Random.hh"
+#include "ANNRIGd_Random.hh"
 // ROOT includes
 #include "TAxis.h"
 #include "TFile.h"
