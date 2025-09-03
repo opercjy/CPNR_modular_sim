@@ -9,7 +9,7 @@
 // INCLUDES
 
 // ANNRIGdGammaSpecModel includes
-#include "RAT/ANNRIGd_ModelType.hh"
+#include "ANNRIGd_ModelType.hh"
 
 //==============================================================================
 // FUNCTION IMPLEMENTATIONS
