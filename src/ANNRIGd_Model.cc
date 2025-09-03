@@ -8,7 +8,7 @@
 // INCLUDES
 
 // ANNRIGdGammaSpecModel includes
-#include "RAT/ANNRIGd_Model.hh"
+#include "ANNRIGd_Model.hh"
 // STD includes
 #include <iostream>
 using std::cout;
