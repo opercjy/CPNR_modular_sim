@@ -1,5 +1,6 @@
 # Geant4 기반 모듈형 검출기 시뮬레이션: CPNR_modular_sim
 <img width="1320" height="1020" alt="image" src="https://github.com/user-attachments/assets/7f61aa08-f10d-4450-8f7b-e7df066cb323" />
+<img width="1320" height="1020" alt="image" src="https://github.com/user-attachments/assets/9fe6eec4-ed72-4ccb-aa1d-d822ee1581be" />
 <img width="1320" height="1020" alt="image" src="https://github.com/user-attachments/assets/a0cb7f6a-d35e-4c8c-9937-1430881596ce" />
 
 ## 1. 프로젝트 개요
