@@ -12,7 +12,7 @@
 // INCLUDES
 
 // ANNRIGdGammaSpecModel includes
-#include "RAT/ANNRIGd_ReactionProduct.hh"
+#include "ANNRIGd_ReactionProduct.hh"
 // Geant4 includes
 #include "G4ReactionProductVector.hh"
 
