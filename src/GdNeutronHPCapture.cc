@@ -1,5 +1,5 @@
 #include "GdNeutronHPCapture.hh"
-#include <cstdlib> // getenv 사용을 위해 추가
+#include <cstdlib> // getenv
 
 // Geant4 includes
 #include "G4GenericMessenger.hh"
@@ -12,18 +12,15 @@
 #include "G4SystemOfUnits.hh"
 #include "G4HadronicException.hh"
 #include "G4ParticleHPThermalBoost.hh"
+#include "G4ParticleHPChannel.hh"
 
-// ANNRI-Gd includes (RAT 경로 제거)
+// ANNRI-Gd includes
 #include "GdNeutronHPCaptureFS.hh"
 #include "ANNRIGd_GdNCaptureGammaGenerator.hh"
 #include "ANNRIGd_GeneratorConfigurator.hh"
 
-// 싱글턴 인스턴스 초기화
 G4ThreadLocal GdNeutronHPCapture* GdNeutronHPCapture::fInstance = nullptr;
 
-/**
- * @brief 싱글턴 인스턴스를 반환하는 static 메소드
- */
 GdNeutronHPCapture* GdNeutronHPCapture::GetInstance() {
     if (fInstance == nullptr) {
         fInstance = new GdNeutronHPCapture();
@@ -31,26 +28,20 @@ GdNeutronHPCapture* GdNeutronHPCapture::GetInstance() {
     return fInstance;
 }
 
-/**
- * @brief 생성자 (private)
- */
 GdNeutronHPCapture::GdNeutronHPCapture() 
   : G4HadronicInteraction("NeutronHPCapture_ANNRI"),
     fIsGeneratorInitialized(false),
-    fCaptureMode(1), // 기본값: natural Gd
-    fCascadeMode(1), // 기본값: discrete + continuum
-    fVerboseLevel(1) // 기본 Verbosity는 1로 설정
+    fCurrentTargetIsotope(nullptr),
+    fCaptureMode(1),
+    fCascadeMode(1),
+    fVerboseLevel(1)
 {
     SetMinEnergy(0.0);
     SetMaxEnergy(20. * MeV);
-    DefineCommands(); // 메신저 초기화
+    DefineCommands();
 }
 
-/**
- * @brief 소멸자
- */
 GdNeutronHPCapture::~GdNeutronHPCapture() {
-    // fMessenger와 fAnnriGammaGen은 unique_ptr이므로 자동 삭제됩니다.
     if (!G4Threading::IsWorkerThread()) {
         if (theCapture != nullptr) {
             for (auto& ite : *theCapture) {
@@ -61,9 +52,6 @@ GdNeutronHPCapture::~GdNeutronHPCapture() {
     }
 }
 
-/**
- * @brief G4GenericMessenger를 이용해 UI 명령어를 정의하는 함수
- */
 void GdNeutronHPCapture::DefineCommands() {
     fMessenger = std::make_unique<G4GenericMessenger>(this, "/myApp/phys/gd/", "ANNRI-Gd Model Control");
 
@@ -78,63 +66,51 @@ void GdNeutronHPCapture::DefineCommands() {
     cascadeCmd.SetParameterName("mode", false);
     cascadeCmd.SetGuidance(" 1: discrete + continuum\n 2: discrete only\n 3: continuum only");
 
-    auto& file155Cmd = fMessenger->DeclareProperty("dataFile155", fGd155DataFile, "Data file for 155Gd(n,g) -> 156Gd continuum");
-    file155Cmd.SetParameterName("filename", false);
-
-    auto& file157Cmd = fMessenger->DeclareProperty("dataFile157", fGd157DataFile, "Data file for 157Gd(n,g) -> 158Gd continuum");
-    file157Cmd.SetParameterName("filename", false);
+    fMessenger->DeclareProperty("dataFile155", fGd155DataFile, "Data file for 155Gd(n,g) -> 156Gd continuum");
+    fMessenger->DeclareProperty("dataFile157", fGd157DataFile, "Data file for 157Gd(n,g) -> 158Gd continuum");
 }
 
-/**
- * @brief ANNRI-Gd 생성기를 멤버 변수에 설정된 값으로 초기화하는 함수
- */
 void GdNeutronHPCapture::InitializeGenerator() {
     if (fIsGeneratorInitialized) return;
+
     const char* dataDirEnv = getenv("GD_CAPTURE_DATA_DIR");
     if (!dataDirEnv) {
-        G4String msg = "Environment variable GD_CAPTURE_DATA_DIR is not set! Please set it to the directory containing ANNRI-Gd data files.";
+        G4String msg = "Environment variable GD_CAPTURE_DATA_DIR is not set!";
         G4Exception("GdNeutronHPCapture::InitializeGenerator()", "FatalError", FatalException, msg);
     }
     
-    // 환경 변수 경로를 사용하여 전체 파일 경로를 재구성합니다.
     G4String dataDir = dataDirEnv;
-    fGd155DataFile = dataDir + "/" + "156GdContTbl_E1SLO4_HFB.root";
-    fGd157DataFile = dataDir + "/" + "158GdContTbl_E1SLO4_HFB.root";
+    fGd155DataFile = dataDir + "/" + "156GdContTbl__E1SLO4__HFB.root";
+    fGd157DataFile = dataDir + "/" + "158GdContTbl__E1SLO4__HFB.root";
 
     if (fVerboseLevel > 0) {
         G4cout << "GdNeutronHPCapture: Initializing ANNRI-Gd Generator..." << G4endl;
         G4cout << ">> Using 155Gd data file: " << fGd155DataFile << G4endl;
         G4cout << ">> Using 157Gd data file: " << fGd157DataFile << G4endl;
     }
+    
     fAnnriGammaGen = std::make_unique<ANNRIGdGammaSpecModel::ANNRIGd_GdNCaptureGammaGenerator>();
     ANNRIGdGammaSpecModel::ANNRIGd_GeneratorConfigurator::Configure(
         *fAnnriGammaGen, 1, 1, fGd155DataFile, fGd157DataFile
     );
     fIsGeneratorInitialized = true;
-    ANNRIGdGammaSpecModel::ANNRIGd_GdNCaptureGammaGenerator* GdNeutronHPCapture::GetANNRIGdGenerator() {
-    // Master 스레드에서만 초기화를 수행합니다.
+    
+    if (fVerboseLevel > 0) {
+        G4cout << "GdNeutronHPCapture: ANNRI-Gd Generator Initialized." << G4endl;
+    }
+}
+
+ANNRIGdGammaSpecModel::ANNRIGd_GdNCaptureGammaGenerator* GdNeutronHPCapture::GetANNRIGdGenerator() {
     if (!fIsGeneratorInitialized && G4Threading::IsMasterThread()) {
         InitializeGenerator();
     }
     return fAnnriGammaGen.get();
-    }
 }
 
-/**
- * @brief ANNRI-Gd 생성기 인스턴스를 반환하는 public getter
- */
-ANNRIGdGammaSpecModel::ANNRIGd_GdNCaptureGammaGenerator* GdNeutronHPCapture::GetANNRIGdGenerator() {
-    if (!fIsGeneratorInitialized) {
-        InitializeGenerator();
-    }
-    return fAnnriGammaGen.get();
-}
-
-/**
- * @brief Geant4 물리 테이블 빌드 시 호출되는 함수. Gd에 커스텀 모델을 등록합니다.
- */
 void GdNeutronHPCapture::BuildPhysicsTable(const G4ParticleDefinition&) {
     if (!G4Threading::IsMasterThread()) return;
+    
+    InitializeGenerator();
 
     G4ParticleHPManager* hpmanager = G4ParticleHPManager::GetInstance();
     theCapture = hpmanager->GetCaptureFinalStates();
@@ -153,7 +129,9 @@ void GdNeutronHPCapture::BuildPhysicsTable(const G4ParticleDefinition&) {
     for (size_t i = theCapture->size(); i < G4Element::GetNumberOfElements(); ++i) {
         theCapture->push_back(new G4ParticleHPChannel);
         if ((*(G4Element::GetElementTable()))[i]->GetZ() == 64) { // Z=64, 가돌리늄
-            G4cout << "ANNRI-Gd Physics: Registering custom model for " << (*(G4Element::GetElementTable()))[i]->GetName() << G4endl;
+            if (fVerboseLevel > 0) {
+                G4cout << "ANNRI-Gd Physics: Registering custom model for " << (*(G4Element::GetElementTable()))[i]->GetName() << G4endl;
+            }
             ((*theCapture)[i])->Init((*(G4Element::GetElementTable()))[i], dirName);
             ((*theCapture)[i])->Register(theGdFS);
         } else {
@@ -166,9 +144,6 @@ void GdNeutronHPCapture::BuildPhysicsTable(const G4ParticleDefinition&) {
     hpmanager->RegisterCaptureFinalStates(theCapture);
 }
 
-/**
- * @brief 상호작용 발생 시 Geant4 커널에 의해 호출되는 메인 함수
- */
 G4HadFinalState* GdNeutronHPCapture::ApplyYourself(const G4HadProjectile& aTrack, G4Nucleus& aNucleus) {
     G4ParticleHPManager::GetInstance()->OpenReactionWhiteBoard();
     
@@ -198,41 +173,39 @@ G4HadFinalState* GdNeutronHPCapture::ApplyYourself(const G4HadProjectile& aTrack
     } else {
         index = theMaterial->GetElement(0)->GetIndex();
     }
-
-    // 선택된 원소에 대해 Final State 모델 호출
-    G4HadFinalState* result = ((*theCapture)[index])->ApplyYourself(aTrack);
     
-    // 타겟 동위원소 정보를 aNucleus에 설정 (FS에서 사용 가능하도록)
     const G4Element* target_element = (*G4Element::GetElementTable())[index];
     G4int targA = G4ParticleHPManager::GetInstance()->GetReactionWhiteBoard()->GetTargA();
     const G4Isotope* target_isotope = nullptr;
-    for (size_t j = 0; j < target_element->GetNumberOfIsotopes(); ++j) {
-        if (target_element->GetIsotope(j)->GetN() == targA) {
-            target_isotope = target_element->GetIsotope(j);
-            break;
+    if(targA > 0) {
+        for (size_t j = 0; j < target_element->GetNumberOfIsotopes(); ++j) {
+            if (target_element->GetIsotope(j)->GetN() == targA) {
+                target_isotope = target_element->GetIsotope(j);
+                break;
+            }
         }
     }
+    
+    this->SetCurrentTargetIsotope(target_isotope);
     if (target_isotope) {
         aNucleus.SetIsotope(target_isotope);
     }
+    
+    G4HadFinalState* result = ((*theCapture)[index])->ApplyYourself(aTrack);
 
     G4ParticleHPManager::GetInstance()->CloseReactionWhiteBoard();
     return result;
 }
 
-/**
- * @brief FS 클래스에서 사용할 captureMode를 결정하는 함수
- */
 G4int GdNeutronHPCapture::GetCaptureModeForIsotope(const G4Isotope* iso) {
-    if (fCaptureMode != 1) { // natural Gd 모드가 아니면, 사용자가 설정한 값을 따름
+    if (fCaptureMode != 1) {
         return fCaptureMode;
     }
-
     if (iso) {
         if (iso->GetName() == "Gd155") return 3;
         if (iso->GetName() == "Gd157") return 2;
     }
-    return 1; // 기본값은 natural Gd
+    return 1;
 }
 
 const std::pair<G4double, G4double> GdNeutronHPCapture::GetFatalEnergyCheckLevels() const {

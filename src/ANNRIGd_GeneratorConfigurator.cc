@@ -9,7 +9,7 @@
 // INCLUDES
 
 // ANNRIGdGammaSpecModel includes
-#include "RAT/ANNRIGd_GeneratorConfigurator.hh"
+#include "ANNRIGd_GeneratorConfigurator.hh"
 
 #include "ANNRIGd_156GdContinuumModelV2.hh"
 #include "ANNRIGd_156GdDiscreteModel.hh"
