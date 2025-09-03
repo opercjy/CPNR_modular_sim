@@ -9,7 +9,7 @@
 // INCLUDES
 
 // ANNRIGdGammaSpecModel includes
-#include "RAT/ANNRIGd_DummyModel.hh"
+#include "ANNRIGd_DummyModel.hh"
 
 #include <iostream>
 using std::cout;
