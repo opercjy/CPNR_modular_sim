@@ -8,10 +8,10 @@
 // INCLUDES
 
 // ANNRIGdSpectrumModel namespace includes
-#include "RAT/ANNRIGd_GdNCaptureGammaGenerator.hh"
+#include "ANNRIGd_GdNCaptureGammaGenerator.hh"
 
-#include "RAT/ANNRIGd_DummyModel.hh"
-#include "RAT/ANNRIGd_Random.hh"
+#include "ANNRIGd_DummyModel.hh"
+#include "ANNRIGd_Random.hh"
 // STD includes
 #include <iostream>
 
