@@ -9,7 +9,7 @@
 // INCLUDES
 
 // ANNRIGdGammaSpecModel includes
-#include "RAT/ANNRIGd_OutputConverter.hh"
+#include "ANNRIGd_OutputConverter.hh"
 // Geant4 includes
 #include "G4Electron.hh"
 #include "G4Gamma.hh"
