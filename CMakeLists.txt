@@ -17,6 +17,9 @@ find_package(ROOT REQUIRED COMPONENTS Core Graf Tree)
 # Geant4의 헤더 파일 및 라이브러리 설정을 현재 프로젝트에 포함시킵니다.
 include(${Geant4_USE_FILE})
 
+# [수정] ROOT 헤더 파일 경로를 추가합니다.
+include_directories(${ROOT_INCLUDE_DIRS})
+
 # 우리 프로젝트의 헤더 파일이 있는 'include' 디렉토리를 경로에 추가합니다.
 include_directories(${PROJECT_SOURCE_DIR}/include)
 
@@ -37,7 +40,21 @@ set(PROJECT_SOURCES
     # [추가] ANNRI-Gd 연동 클래스들
     src/GdNeutronHPCapture.cc
     src/GdNeutronHPCaptureFS.cc
-    
+
+    # [추가] ANNRI-Gd 라이브러리 소스 코드 
+    src/ANNRIGd_156GdContinuumModelV2.cc
+    src/ANNRIGd_156GdDiscreteModel.cc
+    src/ANNRIGd_158GdContinuumModelV2.cc
+    src/ANNRIGd_158GdDiscreteModel.cc
+    src/ANNRIGd_Auxiliary.cc
+    src/ANNRIGd_DummyModel.cc
+    src/ANNRIGd_GdNCaptureGammaGenerator.cc
+    src/ANNRIGd_GeneratorConfigurator.cc
+    src/ANNRIGd_Model.cc
+    src/ANNRIGd_ModelType.cc
+    src/ANNRIGd_OutputConverter.cc
+    src/ANNRIGd_ReactionProduct.cc
+
     # [추가] 새로운 물리 리스트 관련 클래스들
     src/MyHadronPhysics.cc
     src/MyShieldingPhysList.cc
