@@ -8,7 +8,7 @@
 // INCLUDES
 
 // ANNRIGdGammaSpecModel includes
-#include "RAT/ANNRIGd_ReactionProduct.hh"
+#include "ANNRIGd_ReactionProduct.hh"
 
 //==============================================================================
 // STRUCT METHOD IMPLEMENTATIONS
