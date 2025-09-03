@@ -9,9 +9,9 @@
 // INCLUDES
 
 // ANNRIGdGammaSpecModel includes
-#include "RAT/ANNRIGd_Auxiliary.hh"
+#include "ANNRIGd_Auxiliary.hh"
 
-#include "RAT/ANNRIGd_Random.hh"
+#include "ANNRIGd_Random.hh"
 // STD includes
 #include <cmath>
 
