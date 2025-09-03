@@ -11,11 +11,11 @@
 // ANNRIGdGammaSpecModel includes
 #include "RAT/ANNRIGd_GeneratorConfigurator.hh"
 
-#include "RAT/ANNRIGd_156GdContinuumModelV2.hh"
-#include "RAT/ANNRIGd_156GdDiscreteModel.hh"
-#include "RAT/ANNRIGd_158GdContinuumModelV2.hh"
-#include "RAT/ANNRIGd_158GdDiscreteModel.hh"
-#include "RAT/ANNRIGd_GdNCaptureGammaGenerator.hh"
+#include "ANNRIGd_156GdContinuumModelV2.hh"
+#include "ANNRIGd_156GdDiscreteModel.hh"
+#include "ANNRIGd_158GdContinuumModelV2.hh"
+#include "ANNRIGd_158GdDiscreteModel.hh"
+#include "ANNRIGd_GdNCaptureGammaGenerator.hh"
 
 namespace AGd = ANNRIGdGammaSpecModel;
 
