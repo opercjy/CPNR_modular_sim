@@ -12,7 +12,7 @@
 // INCLUDES
 
 // ANNRIGdGammaSpecModel includes
-#include "RAT/ANNRIGd_Model.hh"
+#include "ANNRIGd_Model.hh"
 
 //==============================================================================
 // CLASS DEFINITION
