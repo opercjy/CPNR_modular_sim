@@ -11,8 +11,8 @@
 // INCLUDES
 
 // ANNRIGdGammaSpecModel includes
-#include "RAT/ANNRIGd_ModelType.hh"
-#include "RAT/ANNRIGd_ReactionProduct.hh"
+#include "ANNRIGd_ModelType.hh"
+#include "ANNRIGd_ReactionProduct.hh"
 // STD includes
 #include <utility>
 
