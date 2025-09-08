@@ -33,6 +33,9 @@
 # 설정한 색상 모델을 사용하도록 선택
 /vis/modeling/trajectories/select drawByParticleID-0
 
+# 모든 입자의 궤적을 메모리에 저장하고 화면에 그리도록 명령
+/tracking/storeTrajectory 2
+/vis/scene/add/trajectories
 
 # --- 3. 물리 모델 설정 ---
 # ANNRI-Gd 모델을 natural Gd 모드로, 연속+이산 스펙트럼 모두 사용하도록 설정
