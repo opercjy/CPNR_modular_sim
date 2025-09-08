@@ -1,5 +1,4 @@
 #include "GdNeutronHPCaptureFS.hh"
-#include "GdNeutronHPCapture.hh"
 
 // Geant4 includes
 #include "G4SystemOfUnits.hh"
@@ -32,29 +31,31 @@ G4HadFinalState* GdNeutronHPCaptureFS::ApplyYourself(const G4HadProjectile& theT
 {
     if (theResult.Get() == nullptr) theResult.Put(new G4HadFinalState);
     theResult.Get()->Clear();
-
-    auto manager = GdNeutronHPCapture::GetInstance();
-    auto annriGenerator = manager->GetANNRIGdGenerator();
     
-    const G4Isotope* target_isotope = manager->GetCurrentTargetIsotope();
-    G4int targA = target_isotope ? target_isotope->GetN() : G4ParticleHPManager::GetInstance()->GetReactionWhiteBoard()->GetTargA();
-    G4int targZ = target_isotope ? target_isotope->GetZ() : G4ParticleHPManager::GetInstance()->GetReactionWhiteBoard()->GetTargZ();
-
-    int captureMode = manager->GetCaptureModeForIsotope(target_isotope);
-    int cascadeMode = manager->GetCascadeMode();
-    
-    ANNRIGdGammaSpecModel::ReactionProductVector products;
-    if (captureMode == 1) {
-        products = annriGenerator->Generate_NatGd();
-    } else if (captureMode == 2) {
-        if(cascadeMode == 1)      products = annriGenerator->Generate_158Gd();
-        else if(cascadeMode == 2) products = annriGenerator->Generate_158Gd_Discrete();
-        else                      products = annriGenerator->Generate_158Gd_Continuum();
-    } else if (captureMode == 3) {
-        if(cascadeMode == 1)      products = annriGenerator->Generate_156Gd();
-        else if(cascadeMode == 2) products = annriGenerator->Generate_156Gd_Discrete();
-        else                      products = annriGenerator->Generate_156Gd_Continuum();
+    if (!fAnnriGammaGen) {
+        G4Exception("GdNeutronHPCaptureFS::ApplyYourself()", "FatalError", FatalException, "ANNRI-Gd Generator pointer is null!");
+        return theResult.Get();
     }
+    
+    G4int targA = G4ParticleHPManager::GetInstance()->GetReactionWhiteBoard()->GetTargA();
+    G4int targZ = G4ParticleHPManager::GetInstance()->GetReactionWhiteBoard()->GetTargZ();
+
+    ANNRIGdGammaSpecModel::ReactionProductVector products;
+    if (fCaptureMode == 1) {
+        products = fAnnriGammaGen->Generate_NatGd();
+    } else if (fCaptureMode == 2) {
+        if(fCascadeMode == 1)      products = fAnnriGammaGen->Generate_158Gd();
+        else if(fCascadeMode == 2) products = fAnnriGammaGen->Generate_158Gd_Discrete();
+        else                       products = fAnnriGammaGen->Generate_158Gd_Continuum();
+    } else if (fCaptureMode == 3) {
+        if(fCascadeMode == 1)      products = fAnnriGammaGen->Generate_156Gd();
+        else if(fCascadeMode == 2) products = fAnnriGammaGen->Generate_156Gd_Discrete();
+        else                       products = fAnnriGammaGen->Generate_156Gd_Continuum();
+    }
+    
+    // --- [확인용 출력문] 생성된 감마선 개수를 출력합니다 ---
+    G4cout << "GdNeutronHPCaptureFS: ANNRI-Gd Generator produced " << products.size() << " secondaries." << G4endl;
+    // ---------------------------------------------------------
     
     G4ReactionProduct theNeutron;
     G4ReactionProduct theTarget;
@@ -77,8 +78,15 @@ void GdNeutronHPCaptureFS::CalculateInitialState(const G4HadProjectile& theTrack
     theNeutron.SetMomentum(theTrack.Get4Momentum().vect());
     theNeutron.SetKineticEnergy(theTrack.GetKineticEnergy());
 
+    // --- [최종 수정] 리액션 화이트보드에서 A와 Z를 가져옵니다 ---
+    G4int targA = G4ParticleHPManager::GetInstance()->GetReactionWhiteBoard()->GetTargA();
+    G4int targZ = G4ParticleHPManager::GetInstance()->GetReactionWhiteBoard()->GetTargZ();
+    // -----------------------------------------------------------
+
     G4Nucleus aNucleus;
-    targetMass = G4NucleiProperties::GetNuclearMass(theBaseA, theBaseZ);
+    // --- [최종 수정] 올바른 A와 Z를 사용합니다 ---
+    targetMass = G4NucleiProperties::GetNuclearMass(targA, targZ);
+
     G4ThreeVector neutronVelocity = (1./theNeutron.GetMass()) * theNeutron.GetMomentum();
     theTarget = aNucleus.GetBiasedThermalNucleus(targetMass, neutronVelocity, theTrack.GetMaterial()->GetTemperature());
     
@@ -92,7 +100,10 @@ void GdNeutronHPCaptureFS::AddSecondariesToFinalState(const ANNRIGdGammaSpecMode
     auto g4products = ANNRIGdGammaSpecModel::ANNRIGd_OutputConverter::ConvertToG4(products);
     for (size_t i = 0; i < g4products->size(); ++i) {
         G4ReactionProduct* product = (*g4products)[i];
-        product->Lorentz(*product, -1. * theTarget);
+        
+        // --- [수정] 이 불필요한 좌표 변환 라인을 제거(주석 처리)합니다 ---
+        // product->Lorentz(*product, -1. * theTarget);
+        // ---------------------------------------------------------------
 
         auto theOne = new G4DynamicParticle;
         theOne->SetDefinition(product->GetDefinition());
@@ -107,6 +118,9 @@ void GdNeutronHPCaptureFS::AddSecondariesToFinalState(const ANNRIGdGammaSpecMode
 
 void GdNeutronHPCaptureFS::AddRecoilToFinalState(const G4LorentzVector& pRecoil, G4int targZ, G4int targA) 
 {
+    // 반동핵의 에너지가 너무 작아 추적할 수 없는 경우를 대비한 방어 코드
+    if (pRecoil.e() - pRecoil.m() <= 0.0) return;
+
     G4ParticleDefinition* recoil_def = G4IonTable::GetIonTable()->GetIon(targZ, targA + 1, 0.0);
     auto recoil_particle = new G4DynamicParticle(recoil_def, pRecoil);
     theResult.Get()->AddSecondary(recoil_particle, secID);
@@ -131,7 +145,6 @@ void GdNeutronHPCaptureFS::Init(G4double A, G4double Z, G4int M, const G4String&
     hasFSData = theFinalStatePhotons.InitMean(theData);
     if(hasFSData) {
         targetMass = theFinalStatePhotons.GetTargetMass();
-        // [오타 수정] theFinalStatePhotemons -> theFinalStatePhotons
         theFinalStatePhotons.InitAngular(theData);
         theFinalStatePhotons.InitEnergies(theData);
     }
