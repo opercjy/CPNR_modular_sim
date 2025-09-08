@@ -15,7 +15,7 @@
   * **모듈형 검출기 설계**: 5x5 배열의 개별 세그먼트로 구성되며, `DetectorConstruction.hh`에서 쉽게 크기 조절이 가능합니다.
   * **견고한 기하구조**: `G4SubtractionSolid` 불리언 연산을 통해 모든 구성요소가 겹치지 않도록 설계하여 'Stuck Track'과 같은 네비게이션 오류를 원천적으로 방지합니다.
   * **사실적인 PMT 모델**: 곡면 입사창과 광음극을 가진 5인치 하마마츠 PMT와 광학적 연결을 위한 실리콘 구리스를 구현합니다.
-  * **커스텀 물리 모델**: 표준 차폐 물리 리스트를 기반으로, 가돌리늄(Z=64)의 중성자 포획 반응에만 **ANNRI-Gd 모델**을 동적으로 적용하는 사용자 정의 물리 리스트(`MyShieldingPhysList`)를 사용합니다.
+  * **커스텀 물리 모델**: 표준 차폐 물리 리스트를 기반으로, 가돌리늄(Z=64)의 중성자 포획 반응에만 **ANNRI-Gd 모델** (https://www.physics.okayama-u.ac.jp/~sakuda/ANNRI-Gd_ver1.html)을 동적으로 적용하는 사용자 정의 물리 리스트(`MyShieldingPhysList`)를 사용합니다.
   * **유연한 제어**: Geant4 메신저를 통해 매크로 파일에서 ANNRI-Gd 모델의 상세 옵션(캡처 모드, 데이터 파일 경로 등)을 C++ 코드 수정 없이 제어할 수 있습니다.
   * **상세한 데이터 출력**: `G4AnalysisManager`를 통해 각 상호작용(Hit)과 PMT 광자 검출 정보를 ROOT 파일 형식으로 저장합니다.
 
@@ -26,6 +26,7 @@
 ### 2.1. ANNRI-Gd 데이터 파일
 
 이 시뮬레이션은 ANNRI-Gd의 연속 스펙트럼 모델을 위해 외부 ROOT 데이터 파일이 필요합니다.
+http://www.physics.okayama-u.ac.jp/~sakuda/ANNRI-Gd/cont_dat.zip
 
   * `156GdContTbl_E1SLO4_HFB.root`
   * `158GdContTbl_E1SLO4_HFB.root`
