@@ -6,6 +6,11 @@
 #include "G4LorentzVector.hh"
 #include "ANNRIGd_ReactionProduct.hh"
 
+// Forward declaration
+namespace ANNRIGdGammaSpecModel {
+    class ANNRIGd_GdNCaptureGammaGenerator;
+}
+
 class GdNeutronHPCaptureFS : public G4ParticleHPFinalState {
  public:
   GdNeutronHPCaptureFS();
@@ -18,6 +23,11 @@ class GdNeutronHPCaptureFS : public G4ParticleHPFinalState {
     return new GdNeutronHPCaptureFS;
   }
   
+  // --- [추가] GdNeutronHPCapture로부터 정보를 전달받기 위한 함수들 ---
+  void SetAnnriGenerator(ANNRIGdGammaSpecModel::ANNRIGd_GdNCaptureGammaGenerator* gen) { fAnnriGammaGen = gen; }
+  void SetModes(G4int capMode, G4int casMode) { fCaptureMode = capMode; fCascadeMode = casMode; }
+  // --------------------------------------------------------------------
+
  private:
   void CalculateInitialState(const G4HadProjectile& theTrack, G4ReactionProduct& theNeutron, G4ReactionProduct& theTarget, G4LorentzVector& pInitial);
   void AddSecondariesToFinalState(const ANNRIGdGammaSpecModel::ReactionProductVector& products, const G4ReactionProduct& theTarget, G4LorentzVector& pFinalProducts);
@@ -25,5 +35,11 @@ class GdNeutronHPCaptureFS : public G4ParticleHPFinalState {
 
   G4ParticleHPPhotonDist theFinalStatePhotons;
   G4double targetMass;
+
+  // --- [추가] GdNeutronHPCapture로부터 전달받은 정보를 저장할 멤버 변수 ---
+  ANNRIGdGammaSpecModel::ANNRIGd_GdNCaptureGammaGenerator* fAnnriGammaGen = nullptr;
+  G4int fCaptureMode = 1;
+  G4int fCascadeMode = 1;
+  // --------------------------------------------------------------------
 };
 #endif
