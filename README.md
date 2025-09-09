@@ -1,4 +1,4 @@
-# Geant4 기반 모듈형 검출기 시뮬레이션: CPNR_modular_sim (알파 버전)
+# Geant4 기반 모듈형 검출기 시뮬레이션: CPNR_modular_sim (기하 및 물리 구현 완료, 자료구조 및 알고리즘 개선 중)
 <img width="1320" height="1020" alt="image" src="https://github.com/user-attachments/assets/7f61aa08-f10d-4450-8f7b-e7df066cb323" />
 <img width="1320" height="1020" alt="image" src="https://github.com/user-attachments/assets/9fe6eec4-ed72-4ccb-aa1d-d822ee1581be" />
 <img width="1320" height="1020" alt="image" src="https://github.com/user-attachments/assets/dfaae9f5-c414-4877-8435-efccdc57eee8" />
