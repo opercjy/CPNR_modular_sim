@@ -8,6 +8,10 @@
 #include "G4MaterialPropertiesTable.hh"
 #include "Randomize.hh"
 
+// --- [수정] G4RunManager 사용을 위한 헤더 추가 ---
+#include "G4RunManager.hh" 
+// ---------------------------------------------
+
 PMTSD::PMTSD(const G4String& name)
 : G4VSensitiveDetector(name), fHitsCollection(nullptr)
 {
@@ -28,7 +32,11 @@ G4bool PMTSD::ProcessHits(G4Step* aStep, G4TouchableHistory* /*ROhist*/)
   G4Track* track = aStep->GetTrack();
   if (track->GetDefinition() != G4OpticalPhoton::Definition()) return false;
 
-  // 양자 효율(QE) 기반으로 광자 검출 확률 계산
+  // 디버깅 메시지를 위해 eventID를 가져옵니다.
+  G4int eventID = G4RunManager::GetRunManager()->GetCurrentEvent()->GetEventID();
+  G4cout << "DEBUG (Event " << eventID << "): OpticalPhoton reached photocathode." << G4endl;
+
+
   G4MaterialPropertiesTable* pmtMPT = aStep->GetPreStepPoint()->GetMaterial()->GetMaterialPropertiesTable();
   if (!pmtMPT) return false;
   G4MaterialPropertyVector* qeVector = pmtMPT->GetProperty("EFFICIENCY");
@@ -39,10 +47,17 @@ G4bool PMTSD::ProcessHits(G4Step* aStep, G4TouchableHistory* /*ROhist*/)
     return false;
   }
   
-  // --- [리팩토링] 세그먼트 ID와 PMT ID를 정확히 추출 ---
+  G4cout << "DEBUG (Event " << eventID << "): Photon DETECTED!" << G4endl;
+
+  // --- [수정] 기하구조 계층에 따른 정확한 ID 추출 ---
+  // DetectorConstruction.cc를 기준으로, 광음극(photocathode)의 부모 계층은 다음과 같습니다:
+  // Level 0: PhysPhotocathode (자신)
+  // Level 1: PhysPMT (CopyNo: 0 또는 1 -> pmtID)
+  // Level 2: PhysSegment (CopyNo: 0~24 -> segmentID)
   auto touchable = aStep->GetPreStepPoint()->GetTouchable();
-  G4int pmtID = touchable->GetCopyNumber(0);      // Level 0: Photocathode의 copy number (0 또는 1)
-  G4int segmentID = touchable->GetCopyNumber(1);  // Level 1: PhysSegment의 copy number (0 ~ 153)
+  G4int pmtID = touchable->GetCopyNumber(1);
+  G4int segmentID = touchable->GetCopyNumber(2);
+  // ----------------------------------------------------
 
   PMTHit* newHit = new PMTHit();
   newHit->SetSegmentID(segmentID);

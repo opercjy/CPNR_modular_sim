@@ -1,6 +1,5 @@
 #include "DetectorConstruction.hh"
 
-// Geant4 헤더 파일
 #include "G4NistManager.hh"
 #include "G4Material.hh"
 #include "G4Element.hh"
@@ -9,7 +8,7 @@
 #include "G4Box.hh"
 #include "G4Tubs.hh"
 #include "G4Sphere.hh"
-#include "G4SubtractionSolid.hh"
+#include "G4Polycone.hh"
 #include "G4SDManager.hh"
 #include "G4VisAttributes.hh"
 #include "G4Colour.hh"
@@ -19,46 +18,40 @@
 #include "G4SystemOfUnits.hh"
 #include "G4RotationMatrix.hh"
 
-// 사용자 정의 클래스 헤더
 #include "LSSD.hh"
 #include "PMTSD.hh"
+#include <cmath>
+#include <vector>
 
-#include <cmath> // asin 함수 사용을 위해 추가
-
-/**
- * @brief 생성자
- */
 DetectorConstruction::DetectorConstruction()
  : G4VUserDetectorConstruction(),
    fWorldMaterial(nullptr), fGdLsMaterial(nullptr), fLsMaterial(nullptr),
    fPmmaMaterial(nullptr), fGlassMaterial(nullptr), fPhotocathodeMaterial(nullptr),
-   fVacuumMaterial(nullptr), fSiliconeGrease(nullptr),
+   fVacuumMaterial(nullptr), fSiliconeGrease(nullptr), fTeflonMaterial(nullptr),
+   fTeflonSurface(nullptr),
+   fLogicInnerPmma(nullptr), fLogicOuterPmma(nullptr),
    fLogicLS_inner(nullptr), fLogicLS_outer(nullptr), fLogicPhotocathode(nullptr)
 {
     DefineMaterials();
 }
 
-/**
- * @brief 소멸자
- */
 DetectorConstruction::~DetectorConstruction() {}
 
-/**
- * @brief 시뮬레이션에 사용될 모든 물질과 광학적 특성을 정의하는 함수
- */
 void DetectorConstruction::DefineMaterials()
 {
     auto nist = G4NistManager::Instance();
 
-    // --- 기본 물질 정의 ---
     fWorldMaterial = nist->FindOrBuildMaterial("G4_AIR");
     fPmmaMaterial = nist->FindOrBuildMaterial("G4_PLEXIGLASS");
-    fGlassMaterial = nist->FindOrBuildMaterial("G4_Pyrex_Glass"); 
+    fGlassMaterial = nist->FindOrBuildMaterial("G4_Pyrex_Glass");
     fVacuumMaterial = nist->FindOrBuildMaterial("G4_Galactic");
     fSiliconeGrease = nist->FindOrBuildMaterial("G4_SILICON_DIOXIDE");
     fSiliconeGrease->SetName("SiliconeGrease");
+    
+    fTeflonMaterial = new G4Material("Teflon", 2.2*g/cm3, 2);
+    fTeflonMaterial->AddElement(nist->FindOrBuildElement("C"), 2);
+    fTeflonMaterial->AddElement(nist->FindOrBuildElement("F"), 4);
 
-    // --- 사용자 정의 물질 ---
     fPhotocathodeMaterial = new G4Material("Bialkali", 3.0*g/cm3, 3);
     fPhotocathodeMaterial->AddElement(nist->FindOrBuildElement("K"), 2);
     fPhotocathodeMaterial->AddElement(nist->FindOrBuildElement("Cs"), 1);
@@ -88,13 +81,16 @@ void DetectorConstruction::DefineMaterials()
     fGdLsMaterial->AddMaterial(fLsMaterial, 99.8*perCent);
     fGdLsMaterial->AddElement(elGd, 0.2*perCent);
 
-    // --- 광학 속성 정의 ---
     const std::vector<G4double> photonEnergies = {2.0*eV, 2.5*eV, 2.8*eV, 3.1*eV, 3.5*eV};
 
     auto airMPT = new G4MaterialPropertiesTable();
     airMPT->AddProperty("RINDEX", photonEnergies, std::vector<G4double>(photonEnergies.size(), 1.00));
     fWorldMaterial->SetMaterialPropertiesTable(airMPT);
     
+    auto vacuumMPT = new G4MaterialPropertiesTable();
+    vacuumMPT->AddProperty("RINDEX", photonEnergies, std::vector<G4double>(photonEnergies.size(), 1.0));
+    fVacuumMaterial->SetMaterialPropertiesTable(vacuumMPT);
+
     auto glassMPT = new G4MaterialPropertiesTable();
     glassMPT->AddProperty("RINDEX", photonEnergies, std::vector<G4double>(photonEnergies.size(), 1.47));
     fGlassMaterial->SetMaterialPropertiesTable(glassMPT);
@@ -112,11 +108,16 @@ void DetectorConstruction::DefineMaterials()
     lsMPT->AddConstProperty("RESOLUTIONSCALE", 1.0);
     fLsMaterial->SetMaterialPropertiesTable(lsMPT);
     fGdLsMaterial->SetMaterialPropertiesTable(lsMPT);
+    
+    fTeflonSurface = new G4OpticalSurface("TeflonSurface");
+    fTeflonSurface->SetType(dielectric_dielectric);
+    fTeflonSurface->SetModel(unified);
+    fTeflonSurface->SetFinish(ground);
+    auto teflonMPT = new G4MaterialPropertiesTable();
+    teflonMPT->AddProperty("REFLECTIVITY", photonEnergies, std::vector<G4double>(photonEnergies.size(), 0.99));
+    fTeflonSurface->SetMaterialPropertiesTable(teflonMPT);
 }
 
-/**
- * @brief 최상위 볼륨(World)과 검출기 배열을 생성하는 메인 함수
- */
 G4VPhysicalVolume* DetectorConstruction::Construct()
 {
     auto solidWorld = new G4Box("SolidWorld", kWorldX/2, kWorldY/2, kWorldZ/2);
@@ -125,50 +126,81 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
     logicWorld->SetVisAttributes(G4VisAttributes::GetInvisible());
 
     G4LogicalVolume* logicSegment = ConstructSegment();
+    G4LogicalVolume* logicPMT = ConstructPMT();
+    
+    auto logicGrease = new G4LogicalVolume(new G4Tubs("SolidGrease", 0, kPmtFaceRadius, kGreaseThickness/2.0, 0, CLHEP::twopi),
+                                           fSiliconeGrease, "LogicGrease");
+    logicGrease->SetVisAttributes(new G4VisAttributes(G4Colour(0.8, 0.8, 0.8, 0.2)));
 
-    G4double pitchX = kSegmentWidth + 1.0*cm;
-    G4double pitchY = kSegmentHeight + 1.0*cm;
+    G4double pitchX = kSegmentWidth + 5.0*cm;
+    G4double pitchY = kSegmentHeight + 5.0*cm;
 
     for (G4int j = 0; j < kNy; ++j) {
         for (G4int i = 0; i < kNx; ++i) {
             G4double x = (i - (kNx-1)/2.0) * pitchX;
             G4double y = (j - (kNy-1)/2.0) * pitchY;
             G4int copyNo = j * kNx + i;
+
             new G4PVPlacement(nullptr, G4ThreeVector(x, y, 0), logicSegment, "PhysSegment", logicWorld, false, copyNo, true);
+            
+            G4double grease_pos_z = kSegmentLength/2.0 + kGreaseThickness/2.0;
+            G4double pmt_pos_z = kSegmentLength/2.0 + kGreaseThickness + kPmtHeight;
+            
+            auto rot_180_y = new G4RotationMatrix();
+            rot_180_y->rotateY(180.0*deg);
+
+            // +z 방향 PMT (머리가 -z를 향하도록 180도 회전)
+            new G4PVPlacement(rot_180_y, G4ThreeVector(x, y, pmt_pos_z), logicPMT, "PhysPMT", logicWorld, false, copyNo*2, true);
+            new G4PVPlacement(rot_180_y, G4ThreeVector(x, y, grease_pos_z), logicGrease, "PhysGrease", logicWorld, false, copyNo*2, true);
+
+            // -z 방향 PMT (머리가 +z를 향하도록 회전 없음)
+            new G4PVPlacement(nullptr, G4ThreeVector(x, y, -pmt_pos_z), logicPMT, "PhysPMT", logicWorld, false, copyNo*2+1, true);
+            new G4PVPlacement(nullptr, G4ThreeVector(x, y, -grease_pos_z), logicGrease, "PhysGrease", logicWorld, false, copyNo*2+1, true);
         }
     }
     return physWorld;
 }
 
-/**
- * @brief 사실적인 곡면 PMT를 생성하는 헬퍼 함수
- */
 G4LogicalVolume* DetectorConstruction::ConstructPMT()
 {
-    auto solidPmtAssembly = new G4Tubs("SolidPmtAssembly", 0, kPmtRadius, kPmtHeight/2, 0, CLHEP::twopi);
-    auto logicPmtAssembly = new G4LogicalVolume(solidPmtAssembly, fVacuumMaterial, "LogicPmtAssembly");
-    logicPmtAssembly->SetVisAttributes(G4VisAttributes::GetInvisible());
+    const G4int num_z_planes = 4;
+    G4double z_planes[num_z_planes] = {
+        0.0,
+        kPmtNeckLength,
+        kPmtNeckLength + kPmtTransitionLength,
+        kPmtHeight
+    };
+    G4double r_inner_zeros[num_z_planes] = {0,0,0,0};
     
-    G4double glassThickness = 3.0 * mm;
-    G4double pmt_end_angle = std::asin(kPmtRadius / kPmtSphereRadius);
+    G4double r_outer_glass[num_z_planes] = {
+        kPmtNeckRadius,
+        kPmtNeckRadius,
+        kPmtFaceRadius,
+        kPmtFaceRadius
+    };
+    
+    auto solidPmtGlass = new G4Polycone("SolidPmtGlass", 0, CLHEP::twopi, num_z_planes, z_planes, r_inner_zeros, r_outer_glass);
+    auto logicPmtGlass = new G4LogicalVolume(solidPmtGlass, fGlassMaterial, "LogicPmtGlass");
+    logicPmtGlass->SetVisAttributes(new G4VisAttributes(G4Colour(0.0, 1.0, 1.0, 0.05)));
 
-    auto solidGlassWindow = new G4Sphere("SolidGlassWindow", 
-                                       kPmtSphereRadius - glassThickness, kPmtSphereRadius,
-                                       0, CLHEP::twopi, 0, pmt_end_angle);
-    auto logicGlassWindow = new G4LogicalVolume(solidGlassWindow, fGlassMaterial, "LogicGlassWindow");
-    logicGlassWindow->SetVisAttributes(new G4VisAttributes(G4Colour(0.0, 1.0, 1.0, 0.05)));
+    G4double r_outer_vacuum[num_z_planes];
+    for(int i=0; i<num_z_planes; ++i) {
+      r_outer_vacuum[i] = std::max(0.0, r_outer_glass[i] - kPmtGlassThickness);
+    }
+    
+    auto solidPmtVacuum = new G4Polycone("SolidPmtVacuum", 0, CLHEP::twopi, num_z_planes, z_planes, r_inner_zeros, r_outer_vacuum);
+    auto logicPmtVacuum = new G4LogicalVolume(solidPmtVacuum, fVacuumMaterial, "LogicPmtVacuum");
+    logicPmtVacuum->SetVisAttributes(new G4VisAttributes(G4Colour::White()));
+    new G4PVPlacement(nullptr, G4ThreeVector(), logicPmtVacuum, "PhysPmtVacuum", logicPmtGlass, false, 0, true);
 
-    G4double glassWindow_z = kPmtHeight/2 - kPmtSphereRadius;
-    new G4PVPlacement(nullptr, G4ThreeVector(0, 0, glassWindow_z), logicGlassWindow, "PhysGlassWindow", logicPmtAssembly, false, 0, true);
-
-    auto solidPhotocathode = new G4Sphere("SolidPhotocathode", 
-                                        kPmtSphereRadius - glassThickness - kPhotocathodeThickness, 
-                                        kPmtSphereRadius - glassThickness,
-                                        0, CLHEP::twopi, 0, pmt_end_angle);
+    G4double vac_neck_radius = kPmtNeckRadius - kPmtGlassThickness;
+    auto solidPhotocathode = new G4Tubs("SolidPhotocathode", 0, vac_neck_radius, kPhotocathodeThickness/2.0, 0, CLHEP::twopi);
     fLogicPhotocathode = new G4LogicalVolume(solidPhotocathode, fPhotocathodeMaterial, "LogicPhotocathode");
     fLogicPhotocathode->SetVisAttributes(new G4VisAttributes(G4Colour::Red()));
-    new G4PVPlacement(nullptr, G4ThreeVector(0, 0, glassWindow_z), fLogicPhotocathode, "PhysPhotocathode", logicPmtAssembly, false, 0, true);
-
+    
+    G4double pc_pos_z = kPmtNeckLength + kPhotocathodeThickness/2.0;
+    new G4PVPlacement(nullptr, G4ThreeVector(0,0,pc_pos_z), fLogicPhotocathode, "PhysPhotocathode", logicPmtVacuum, false, 0, true);
+    
     auto photocathode_opsurf = new G4OpticalSurface("Photocathode_OpSurface");
     photocathode_opsurf->SetType(dielectric_metal);
     photocathode_opsurf->SetModel(unified);
@@ -178,80 +210,68 @@ G4LogicalVolume* DetectorConstruction::ConstructPMT()
     const std::vector<G4double> efficiency = {0.15, 0.22, 0.28, 0.22, 0.10};
     auto pmtMPT = new G4MaterialPropertiesTable();
     pmtMPT->AddProperty("EFFICIENCY", energies_qe, efficiency);
+    fPhotocathodeMaterial->SetMaterialPropertiesTable(pmtMPT);
     photocathode_opsurf->SetMaterialPropertiesTable(pmtMPT);
     new G4LogicalSkinSurface("Photocathode_SkinSurface", fLogicPhotocathode, photocathode_opsurf);
 
-    return logicPmtAssembly;
+    return logicPmtGlass;
 }
 
-/**
- * @brief 불리언 연산을 사용하여 단일 세그먼트를 생성하는 함수
- */
 G4LogicalVolume* DetectorConstruction::ConstructSegment()
 {
-    // --- 1. 각 구성요소의 '틀(Mold)'이 될 기본 솔리드들을 정의합니다. ---
-    auto pмма_mold = new G4Box("pmma_mold", kSegmentWidth/2, kSegmentHeight/2, kSegmentLength/2);
-    
-    G4double pmmThickness = 0.5*cm;
-    auto scint_region_mold = new G4Box("scint_region_mold", 
-                                       kSegmentWidth/2 - pmmThickness, 
-                                       kSegmentHeight/2 - pmmThickness, 
-                                       kSegmentLength/2);
+    auto solidOuterPmma = new G4Box("SolidOuterPmma", kSegmentWidth/2, kSegmentHeight/2, kSegmentLength/2);
+    auto logicOuterPmma = new G4LogicalVolume(solidOuterPmma, fPmmaMaterial, "LogicOuterPmma");
+    logicOuterPmma->SetVisAttributes(new G4VisAttributes(G4Colour(0.0, 1.0, 1.0, 0.1)));
 
-    auto core_mold = new G4Box("core_mold", 
-                               kInnerCoreWidth/2, 
-                               kInnerCoreHeight/2, 
-                               kSegmentLength/2);
-
-    // --- 2. '빼기' 연산을 통해 각 부품의 최종 모양(Solid)을 조각합니다. ---
-    auto solidPmma_Hollow = new G4SubtractionSolid("SolidPmma_Hollow", pмма_mold, scint_region_mold);
-    auto solidLS_outer_Shell = new G4SubtractionSolid("SolidLS_outer_Shell", scint_region_mold, core_mold);
-    auto solidLS_inner_Core = core_mold;
-
-    // --- 3. 조각된 모양들로 각각의 논리 볼륨(Logical Volume)을 생성합니다. ---
-    auto logicPmma = new G4LogicalVolume(solidPmma_Hollow, fPmmaMaterial, "LogicPmma");
-    logicPmma->SetVisAttributes(new G4VisAttributes(G4Colour(0.0, 1.0, 1.0, 0.1)));
-
-    fLogicLS_outer = new G4LogicalVolume(solidLS_outer_Shell, fLsMaterial, "LogicLS_outer");
+    G4double outerLS_width = kSegmentWidth - 2 * kOuterPmmaThickness;
+    G4double outerLS_height = kSegmentHeight - 2 * kOuterPmmaThickness;
+    G4double outerLS_length = kSegmentLength - 2 * kOuterPmmaThickness;
+    auto solidOuterLS = new G4Box("SolidOuterLS", outerLS_width/2, outerLS_height/2, outerLS_length/2);
+    fLogicLS_outer = new G4LogicalVolume(solidOuterLS, fLsMaterial, "LogicLS_outer");
     fLogicLS_outer->SetVisAttributes(new G4VisAttributes(G4Colour(1.0, 1.0, 0.0, 0.2)));
-    
-    fLogicLS_inner = new G4LogicalVolume(solidLS_inner_Core, fGdLsMaterial, "LogicLS_inner");
+    new G4PVPlacement(nullptr, G4ThreeVector(0,0,0), fLogicLS_outer, "PhysLS_outer", logicOuterPmma, false, 0, true);
+
+    auto solidInnerPmma = new G4Box("SolidInnerPmma", kInnerContainerWidth/2, kInnerContainerHeight/2, kInnerContainerLength/2);
+    auto logicInnerPmma = new G4LogicalVolume(solidInnerPmma, fPmmaMaterial, "LogicInnerPmma");
+    logicInnerPmma->SetVisAttributes(new G4VisAttributes(G4Colour(0.0, 0.8, 0.8, 0.3)));
+    new G4PVPlacement(nullptr, G4ThreeVector(0,0,0), logicInnerPmma, "PhysInnerPmma", fLogicLS_outer, false, 0, true);
+
+    G4double innerLS_width = kInnerContainerWidth - 2 * kInnerPmmaThickness;
+    G4double innerLS_height = kInnerContainerHeight - 2 * kInnerPmmaThickness;
+    G4double innerLS_length = kInnerContainerLength - 2 * kInnerPmmaThickness;
+    auto solidInnerLS = new G4Box("SolidInnerLS", innerLS_width/2, innerLS_height/2, innerLS_length/2);
+    fLogicLS_inner = new G4LogicalVolume(solidInnerLS, fGdLsMaterial, "LogicLS_inner");
     fLogicLS_inner->SetVisAttributes(new G4VisAttributes(G4Colour(1.0, 0.5, 0.0, 0.4)));
+    new G4PVPlacement(nullptr, G4ThreeVector(0,0,0), fLogicLS_inner, "PhysLS_inner", logicInnerPmma, false, 0, true);
+    
+    G4double pillar_length = (outerLS_height - kInnerContainerHeight) / 2.0;
+    auto solidPillar = new G4Tubs("SolidPillar", 0, kPillarRadius, pillar_length/2, 0, CLHEP::twopi);
+    auto logicPillar = new G4LogicalVolume(solidPillar, fPmmaMaterial, "LogicPillar");
+    logicPillar->SetVisAttributes(new G4VisAttributes(G4Colour(0.0, 1.0, 1.0, 0.2)));
 
-    // --- 4. 최종 조립: 각 부품을 제자리에 배치합니다. ---
-    G4double assemblyHalfZ = kSegmentLength/2 + kGreaseThickness + kPmtHeight;
-    auto solidAssembly = new G4Box("SolidAssembly", kSegmentWidth/2, kSegmentHeight/2, assemblyHalfZ);
-    auto logicAssembly = new G4LogicalVolume(solidAssembly, fWorldMaterial, "LogicAssembly");
-    logicAssembly->SetVisAttributes(G4VisAttributes::GetInvisible());
-    
-    new G4PVPlacement(nullptr, G4ThreeVector(0,0,0), logicPmma, "PhysPmma", logicAssembly, false, 0, true);
-    new G4PVPlacement(nullptr, G4ThreeVector(0,0,0), fLogicLS_outer, "PhysLS_outer", logicAssembly, false, 0, true);
-    new G4PVPlacement(nullptr, G4ThreeVector(0,0,0), fLogicLS_inner, "PhysLS_inner", logicAssembly, false, 0, true);
+    auto pillar_rot = new G4RotationMatrix();
+    pillar_rot->rotateX(90.0 * deg);
 
-    auto logicGrease = new G4LogicalVolume(new G4Tubs("SolidGrease", 0, kPmtRadius, kGreaseThickness/2.0, 0, CLHEP::twopi),
-                                           fSiliconeGrease, "LogicGrease");
-    logicGrease->SetVisAttributes(new G4VisAttributes(G4Colour(0.8, 0.8, 0.8, 0.2)));
+    G4double pillar_y_pos = kInnerContainerHeight/2 + pillar_length/2;
+    G4double start_z = -kInnerContainerLength/2 + 20*cm;
+    G4double end_z = kInnerContainerLength/2 - 20*cm;
+    G4double z_spacing = (end_z - start_z) / (kPillarCount - 1);
     
-    G4LogicalVolume* logicPMT = ConstructPMT();
-    
-    G4double greasePos_z = kSegmentLength/2 + kGreaseThickness/2;
-    G4double pmtPos_z = kSegmentLength/2 + kGreaseThickness + kPmtHeight/2;
-    
-    auto rot_180 = new G4RotationMatrix();
-    rot_180->rotateY(180.0 * deg);
+    for (G4int i=0; i<kPillarCount; ++i)
+    {
+        G4double pillar_z_pos = start_z + i*z_spacing;
+        G4ThreeVector pos;
+        if (i % 2 == 0) {
+            pos = G4ThreeVector(0, pillar_y_pos, pillar_z_pos);
+        } else {
+            pos = G4ThreeVector(0, -pillar_y_pos, pillar_z_pos);
+        }
+        new G4PVPlacement(pillar_rot, pos, logicPillar, "PhysPillar", fLogicLS_outer, false, i, true);
+    }
 
-    new G4PVPlacement(nullptr, G4ThreeVector(0, 0, greasePos_z), logicGrease, "PhysGrease", logicAssembly, false, 0, true);
-    new G4PVPlacement(nullptr, G4ThreeVector(0, 0, pmtPos_z), logicPMT, "PhysPMT", logicAssembly, false, 0, true);
-    
-    new G4PVPlacement(rot_180, G4ThreeVector(0, 0, -greasePos_z), logicGrease, "PhysGrease", logicAssembly, false, 1, true);
-    new G4PVPlacement(rot_180, G4ThreeVector(0, 0, -pmtPos_z), logicPMT, "PhysPMT", logicAssembly, false, 1, true);
-
-    return logicAssembly;
+    return logicOuterPmma;
 }
 
-/**
- * @brief Sensitive Detector(SD)들을 각각의 논리 볼륨에 할당하는 함수
- */
 void DetectorConstruction::ConstructSDandField()
 {
     auto sdManager = G4SDManager::GetSDMpointer();

@@ -28,7 +28,9 @@ G4bool LSSD::ProcessHits(G4Step* aStep, G4TouchableHistory* /*ROhist*/)
 
   LSHit* newHit = new LSHit();
   G4Track* track = aStep->GetTrack();
-  
+  auto preStepPoint = aStep->GetPreStepPoint();
+
+  // --- 기본 정보 저장 ---
   newHit->SetTrackID(track->GetTrackID());
   newHit->SetParentID(track->GetParentID());
   newHit->SetParticleName(track->GetDefinition()->GetParticleName());
@@ -41,10 +43,16 @@ G4bool LSSD::ProcessHits(G4Step* aStep, G4TouchableHistory* /*ROhist*/)
     newHit->SetProcessName("primary");
   }
 
-  newHit->SetPosition(aStep->GetPreStepPoint()->GetPosition());
-  newHit->SetTime(aStep->GetPreStepPoint()->GetGlobalTime());
-  newHit->SetKineticEnergy(aStep->GetPreStepPoint()->GetKineticEnergy());
+  newHit->SetPosition(preStepPoint->GetPosition());
+  newHit->SetTime(preStepPoint->GetGlobalTime());
+  newHit->SetKineticEnergy(preStepPoint->GetKineticEnergy());
   newHit->SetEnergyDeposit(aStep->GetTotalEnergyDeposit());
+
+  // --- [추가] 확장된 물리 정보 저장 ---
+  newHit->SetPDGID(track->GetDefinition()->GetPDGEncoding());
+  newHit->SetMomentum(preStepPoint->GetMomentum());
+  newHit->SetEnergy(preStepPoint->GetTotalEnergy());
+  // ------------------------------------
 
   fHitsCollection->insert(newHit);
 

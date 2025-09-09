@@ -29,6 +29,9 @@ MyShieldingPhysList::MyShieldingPhysList(G4int verbose)
 
     // 5. 강입자 물리 (Hadronic Physics) - ANNRI-Gd 모델이 포함된 우리 커스텀 모듈
     RegisterPhysics(new MyHadronPhysics(verbose));
+
+    // --- [수정] 정의된 컷 값을 Geant4 커널에 실제로 적용하라는 명령 추가 ---
+    SetCuts();
 }
 
 MyShieldingPhysList::~MyShieldingPhysList()

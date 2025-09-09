@@ -27,6 +27,7 @@ EventAction::~EventAction() {}
  * 1) 상세 에너지 증착 정보를 'Hits' TTree에 저장하고,
  * 2) PMT에서 검출된 광자 정보를 'PMTHits' TTree에 저장하는 역할을 수행합니다.
  */
+
 void EventAction::EndOfEventAction(const G4Event* event)
 {
   auto analysisManager = G4AnalysisManager::Instance();
@@ -37,9 +38,10 @@ void EventAction::EndOfEventAction(const G4Event* event)
   if (lsHcID >= 0) {
     auto lsHitsCollection = static_cast<LSHitsCollection*>(event->GetHCofThisEvent()->GetHC(lsHcID));
     if (lsHitsCollection && lsHitsCollection->entries() > 0) {
-      // Hits TTree (Ntuple ID=0)에 상세 정보 저장
       for (size_t i = 0; i < lsHitsCollection->entries(); ++i) {
         auto hit = (*lsHitsCollection)[i];
+
+        // --- 기본 정보 채우기 ---
         analysisManager->FillNtupleIColumn(0, 0, eventID);
         analysisManager->FillNtupleIColumn(0, 1, hit->GetTrackID());
         analysisManager->FillNtupleIColumn(0, 2, hit->GetParentID());
@@ -52,24 +54,32 @@ void EventAction::EndOfEventAction(const G4Event* event)
         analysisManager->FillNtupleDColumn(0, 9, hit->GetTime() / ns);
         analysisManager->FillNtupleDColumn(0, 10, hit->GetKineticEnergy() / MeV);
         analysisManager->FillNtupleDColumn(0, 11, hit->GetEnergyDeposit() / MeV);
+
+        // --- [수정] 확장된 정보 채우기 ---
+        analysisManager->FillNtupleIColumn(0, 12, hit->GetPDGID());
+        analysisManager->FillNtupleDColumn(0, 13, hit->GetPx() / MeV);
+        analysisManager->FillNtupleDColumn(0, 14, hit->GetPy() / MeV);
+        analysisManager->FillNtupleDColumn(0, 15, hit->GetPz() / MeV);
+        analysisManager->FillNtupleDColumn(0, 16, hit->GetEnergy() / MeV);
+        // ------------------------------------
+
         analysisManager->AddNtupleRow(0);
       }
     }
   }
-  
+
   // --- PMT 데이터 처리 (PMTHitsCollection) ---
+  // (이 부분은 변경 없음)
   G4int pmtHcID = G4SDManager::GetSDMpointer()->GetCollectionID("PMTHitsCollection");
   if (pmtHcID >= 0) {
     auto pmtHitsCollection = static_cast<PMTHitsCollection*>(event->GetHCofThisEvent()->GetHC(pmtHcID));
     if (pmtHitsCollection && pmtHitsCollection->entries() > 0) {
-      // PMTHits TTree (Ntuple ID=1)에 저장
       for (size_t i = 0; i < pmtHitsCollection->entries(); ++i) {
         auto pmtHit = (*pmtHitsCollection)[i];
-        
         analysisManager->FillNtupleIColumn(1, 0, eventID);
         analysisManager->FillNtupleIColumn(1, 1, pmtHit->GetSegmentID());
         analysisManager->FillNtupleIColumn(1, 2, pmtHit->GetPMTID());
-        analysisManager->FillNtupleDColumn(1, 3, pmtHit->GetTime());
+        analysisManager->FillNtupleDColumn(1, 3, pmtHit->GetTime() / ns); // 단위 적용
         analysisManager->AddNtupleRow(1);
       }
     }

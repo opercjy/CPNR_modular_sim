@@ -1,3 +1,5 @@
+// include/LSHit.hh
+
 #ifndef LSHit_h
 #define LSHit_h 1
 
@@ -6,11 +8,8 @@
 #include "G4Allocator.hh"
 #include "G4ThreeVector.hh"
 #include "G4String.hh"
+#include "G4SystemOfUnits.hh" // MeV, ns 등 단위 사용을 위해 추가
 
-/**
- * @class LSHit
- * @brief LS 또는 Gd-LS에서 발생하는 에너지 증착(hit) 정보를 저장하는 데이터 클래스입니다.
- */
 class LSHit : public G4VHit
 {
 public:
@@ -20,7 +19,7 @@ public:
   inline void* operator new(size_t);
   inline void  operator delete(void*);
 
-  // Setters and Getters
+  // --- 기존 Setters and Getters ---
   void SetTrackID(G4int id) { fTrackID = id; }
   G4int GetTrackID() const { return fTrackID; }
 
@@ -48,6 +47,19 @@ public:
   void SetEnergyDeposit(G4double edep) { fEnergyDeposit = edep; }
   G4double GetEnergyDeposit() const { return fEnergyDeposit; }
 
+  // --- [추가] 4-운동량 및 PDG ID Setters and Getters ---
+  void SetPDGID(G4int pdgID) { fPDGID = pdgID; }
+  G4int GetPDGID() const { return fPDGID; }
+
+  void SetMomentum(const G4ThreeVector& p) { fPx = p.x(); fPy = p.y(); fPz = p.z(); }
+  G4double GetPx() const { return fPx; }
+  G4double GetPy() const { return fPy; }
+  G4double GetPz() const { return fPz; }
+
+  void SetEnergy(G4double e) { fEnergy = e; }
+  G4double GetEnergy() const { return fEnergy; }
+
+
 private:
   G4int         fTrackID;
   G4int         fParentID;
@@ -58,6 +70,13 @@ private:
   G4double      fTime;
   G4double      fKineticEnergy;
   G4double      fEnergyDeposit;
+  
+  // --- [추가] 새로운 멤버 변수 ---
+  G4int         fPDGID;
+  G4double      fPx;
+  G4double      fPy;
+  G4double      fPz;
+  G4double      fEnergy;
 };
 
 typedef G4THitsCollection<LSHit> LSHitsCollection;
